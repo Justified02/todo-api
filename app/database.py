@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_connection():
-    return psycopg.connect(os.environ["DATABASE_URL"])
+    return psycopg.connect(os.environ["DATABASE_URL"], row_factory=psycopg.rows.dict_row)
 
 def init_db():
     conn = get_connection()
@@ -16,7 +16,7 @@ def init_db():
             done BOOLEAN NOT NULL DEFAULT FALSE
         )
     """)
-    count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+    count = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()["count"]
     if count == 0:
         conn.execute(
             "INSERT INTO tasks (title, done) VALUES (%s, %s), (%s, %s), (%s, %s)",
