@@ -1,6 +1,6 @@
 # Task API
 
-[1-2 sentences: what this is, what it does]
+A small REST API for managing a to-do list, built with FastAPI as a hands-on exercise in backend fundamentals — full CRUD operations, request validation, proper HTTP status codes, and interactive API docs via Swagger UI. Data is stored in memory (no database yet).
 
 ## Run it
 
