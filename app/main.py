@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from app.database import init_db
 
 class TaskCreate(BaseModel):
     title: str
@@ -17,6 +18,8 @@ tasks = [
 ]
 
 app = FastAPI()
+
+init_db()
 
 @app.exception_handler(RequestValidationError)
 def validation_error_handler(request: Request, exc: RequestValidationError):
