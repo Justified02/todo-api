@@ -6,6 +6,10 @@ from fastapi.responses import JSONResponse
 class TaskCreate(BaseModel):
     title: str
 
+class TaskUpdate(BaseModel):
+    title: str
+    done: bool
+
 tasks = [
     {"id": 1, "title": "Buy milk", "done": False},
     {"id": 2, "title": "Walk the dog", "done": False},
@@ -51,3 +55,22 @@ def create_task(new_task: TaskCreate):
     task = {"id": next_id, "title": new_task.title, "done": False}
     tasks.append(task)
     return task
+
+
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, new_update: TaskUpdate):
+    for task in tasks:
+        if task["id"] == task_id:
+            task["title"] = new_update.title
+            task["done"] = new_update.done
+            return task
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+
+@app.delete("/tasks/{task_id}", status_code=204)
+def delete_task(task_id: int):
+    for task in tasks:
+        if task["id"] == task_id:
+            tasks.remove(task)
+            return {"message": "task deleted successfully"}
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
