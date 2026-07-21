@@ -12,6 +12,10 @@ class TaskUpdate(BaseModel):
     title: str
     done: bool
 
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
 
 app = FastAPI()
 
@@ -88,3 +92,28 @@ def delete_task(task_id: int):
     row = conn.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
     conn.commit()
     conn.close()
+
+
+@app.post("/auth/signup", status_code=201)
+def signup(credentials: AuthRequest):
+    result = supabase.auth.sign_up({
+        "email": credentials.email,
+        "password": credentials.password
+    })
+    return {"user": result.user}
+
+
+@app.post("/auth/login")
+def login(credentials: AuthRequest):
+    try:
+        result = supabase.auth.sign_in_with_password({
+            "email": credentials.email,
+            "password": credentials.password
+        })
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid login credentials")
+
+    return {
+        "access_token": result.session.access_token,
+        "refresh_token": result.session.refresh_token
+    }
