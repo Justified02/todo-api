@@ -117,3 +117,17 @@ def login(credentials: AuthRequest):
         "access_token": result.session.access_token,
         "refresh_token": result.session.refresh_token
     }
+
+
+@app.get("/public/info")
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get("/protected/profile")
+def profile(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+    token = auth_header.split(" ")[1]
+    return {"token_received": token}
