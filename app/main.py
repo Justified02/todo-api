@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from app.database import init_db, get_connection
+from app.auth import supabase
 
 class TaskCreate(BaseModel):
     title: str
