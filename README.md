@@ -1,10 +1,10 @@
 # Task API
 
-A small REST API for managing a to-do list, built with Python and FastAPI. It supports full CRUD operations (create, read, update, delete), validates incoming data, returns proper HTTP status codes, and ships with interactive API docs via Swagger UI. Tasks are persisted in PostgreSQL, running in Docker alongside the app — the whole stack starts with a single command.
+A REST API for managing a to-do list, built with Python and FastAPI. It supports full CRUD operations (create, read, update, delete), user authentication via Supabase, validates incoming data, returns proper HTTP status codes, and ships with interactive API docs via Swagger UI. Tasks are persisted in PostgreSQL, running in Docker alongside the app — the whole stack starts with a single command.
 
 ## Run it
 
-Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Podman) installed and running.
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Podman) installed and running, plus a free [Supabase](https://supabase.com) project for authentication.
 
 ```bash
 git clone <your-repo-url>
@@ -32,15 +32,63 @@ This expects `DATABASE_URL` in your `.env` to point at `localhost` (see `.env.ex
 
 ## Configuration
 
-Copy `.env.example` to `.env` and adjust if needed:
+Copy `.env.example` to `.env` and fill in your own values:
 
 ```
 DATABASE_URL=postgresql://postgres:dev@localhost:5432/tasks
+SUPABASE_URL=your_project_url
+SUPABASE_KEY=your_anon_key
+PORT=8000
 ```
+
+- `DATABASE_URL` — connection string for the Postgres container.
+- `SUPABASE_URL` / `SUPABASE_KEY` — from your Supabase project's **Project Settings → API**. Use the **anon** key here, never the `service_role` key.
 
 `.env` is git-ignored — real credentials never get committed. `.env.example` documents which variables are required with placeholder values.
 
-## Endpoints
+## Authentication
+
+User accounts, password hashing, and token signing are all handled by **Supabase Auth** — this API never touches passwords or cryptography directly. It only forwards credentials to Supabase and verifies the tokens Supabase issues.
+
+**How it works:**
+
+1. A client signs up or logs in with an email and password.
+2. Supabase validates the credentials and returns an access token (JWT).
+3. The client sends that token in the `Authorization: Bearer <token>` header on every request to a protected route.
+4. A reusable FastAPI dependency (`get_current_user`) extracts the token and asks Supabase to verify it before the route runs.
+
+Verification is a live check against Supabase (`supabase.auth.get_user(token)`), not just a local signature check — so logging out revokes access immediately, on the very next request, rather than waiting for the token to naturally expire.
+
+| Method | Path | Auth required | Description |
+|---|---|---|---|
+| POST | `/auth/signup` | No | Create a new user account |
+| POST | `/auth/login` | No | Authenticate and receive an access token |
+| POST | `/auth/logout` | Yes (Bearer token) | End the current session |
+| GET | `/protected/profile` | Yes (Bearer token) | Return the logged-in user's profile data |
+| GET | `/protected/dashboard` | Yes (Bearer token) | Example second protected route, demonstrates the auth guard is reusable |
+| GET | `/public/info` | No | Open, unauthenticated endpoint |
+
+**Auth status codes:** `201` created (signup) · `200` success (login/read) · `204` no content (logout) · `400` bad request (missing email/password) · `401` unauthorized (missing, malformed, invalid, or expired token).
+
+**Testing auth via curl:**
+
+```bash
+# Sign up
+curl -i -X POST http://localhost:8000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+# Log in
+curl -i -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+# Call a protected route (replace TOKEN with the access_token from login)
+curl -i http://localhost:8000/protected/profile \
+  -H "Authorization: Bearer TOKEN"
+```
+
+## Task endpoints
 
 | Method | Path          | Description                          |
 |--------|---------------|---------------------------------------|
@@ -66,7 +114,7 @@ content-type: application/json
 
 ## Swagger UI
 
-`/docs` lists every endpoint with a "Try it out" button that sends real requests — the full CRUD cycle (create, list, update, delete) can be run entirely from this page, no `curl` needed.
+`/docs` lists every endpoint with a "Try it out" button that sends real requests — the full CRUD cycle (create, list, update, delete) can be run entirely from this page, no `curl` needed. Protected routes show a lock icon; click **Authorize** at the top of the page, paste a bearer token obtained from `/auth/login`, and `/docs` will attach it to every subsequent "Try it out" call automatically.
 
 ![Swagger UI](screenshots/swagger.png)
 
@@ -100,3 +148,4 @@ Run against the database inside the `db` container (`docker exec -it <container>
 
 - No database migrations yet — schema changes currently mean manually altering the table.
 - No production-hardening (TLS, connection pooling, secrets management beyond `.env`) — this is a local development / learning setup.
+- Task endpoints (`/tasks`) are not currently gated behind authentication — only the `/protected/*` demo routes require a token. Wiring auth into the task routes themselves would be a natural next step.
