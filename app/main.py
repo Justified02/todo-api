@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from pydantic import BaseModel
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from app.database import init_db, get_connection
 from app.auth import supabase
+from app.auth import get_current_user
 
 class TaskCreate(BaseModel):
     title: str
@@ -94,6 +95,7 @@ def delete_task(task_id: int):
     conn.close()
 
 
+# sign up route
 @app.post("/auth/signup", status_code=201)
 def signup(credentials: AuthRequest):
     result = supabase.auth.sign_up({
@@ -103,6 +105,7 @@ def signup(credentials: AuthRequest):
     return {"user": result.user}
 
 
+# login route
 @app.post("/auth/login")
 def login(credentials: AuthRequest):
     try:
@@ -119,15 +122,25 @@ def login(credentials: AuthRequest):
     }
 
 
+# publicly accessible route - no middleware
 @app.get("/public/info")
 def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
 
+# protected route - theres middleware
 @app.get("/protected/profile")
-def profile(request: Request):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Access token required")
-    token = auth_header.split(" ")[1]
-    return {"token_received": token}
+def profile(current_user = Depends(get_current_user)):
+    return {"id": current_user.id, "email": current_user.email, "created_at": current_user.created_at}
+
+
+# Log Out route
+@app.post("/auth/logout", status_code=204)
+def logout(current_user = Depends(get_current_user)):
+    supabase.auth.sign_out()
+    return {"message": "log out successful"}
+
+
+@app.get("/protected/dashboard")
+def dashboard(current_user = Depends(get_current_user)):
+    return {"message": f"Welcome to your dashboard, {current_user.email}"}
